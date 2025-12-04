@@ -81,6 +81,8 @@ void enviarEstadoTimon();
 void enviarNivelSonido();
 void enviarUltimaAccion();
 void enviarNivelLluvia();
+void enviarEstadoAlarma();
+void enviarSeguirLuz();
 
 void setup()
 {
@@ -109,6 +111,27 @@ void setup()
 
 void loop()
 {
+    // ==== RECEPCIÓN DE COMANDOS POR SERIAL ====
+    if (Serial.available())
+    {
+        String cmd = Serial.readStringUntil('\n');
+        cmd.trim();
+
+        if (cmd == "alarmas_on")
+        {
+            alarmas = true;
+        }
+        else if (cmd == "alarmas_off")
+        {
+            alarmas = false;
+        }
+        else if (cmd == "seguir_luz")
+        {
+            seguirLuz = true;
+        }
+        else if (cmd == "no_seguir")
+            seguirLuz = false;
+    }
     valorLDRDerecha = analogRead(ldrDerechaPin);
     valorLDRIzquierda = analogRead(ldrIzquierdaPin);
 
@@ -136,7 +159,7 @@ void loop()
     distanciaAtras = medirDistanciaAtras();
     enviarDistancias();
 
-    if ((distanciaAdelante < 7 || distanciaAtras < 7) and alarmas)
+    if ((distanciaAdelante < 7 || distanciaAtras < 7) && alarmas)
     {
         digitalWrite(buzzerPin, HIGH);
         delay(200);
@@ -186,8 +209,9 @@ void loop()
     enviarEstadoTimon();
     enviarUltimaAccion();
     enviarIntensidadLuz();
+    enviarEstadoAlarma();
+    enviarSeguirLuz();
 
-    
     delay(80);
 }
 
@@ -410,6 +434,22 @@ void enviarNivelLluvia()
 {
     StaticJsonDocument<128> doc;
     doc["rain_level"] = nivelAgua;
+    serializeJson(doc, Serial);
+    Serial.println();
+}
+
+void enviarEstadoAlarma()
+{
+    StaticJsonDocument<128> doc;
+    doc["alarm_status"] = alarmas;
+    serializeJson(doc, Serial);
+    Serial.println();
+}
+
+void enviarSeguirLuz()
+{
+    StaticJsonDocument<128> doc;
+    doc["follow_light"] = seguirLuz;
     serializeJson(doc, Serial);
     Serial.println();
 }
