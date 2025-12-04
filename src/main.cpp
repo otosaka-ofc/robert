@@ -39,7 +39,7 @@ String estadoTimon = "CENTRO";
 int valorLDRDerecha;
 int valorLDRIzquierda;
 String direccionLuz = "NINGUNA";
-bool seguirLuz = false;
+bool seguirLuz = true;
 int intensidadActual;
 String ultimaAccion = "FRENAR";
 long distanciaAdelante;
@@ -49,8 +49,12 @@ int nivelSonido;
 int nivelAgua;
 
 DHT dht(dhtPin, DHTTYPE);
+
 unsigned long ultimoDHT = 0;
 const unsigned long intervaloDHT = 2000; // leer cada 2s
+
+unsigned long ultimoPulso = 0;
+const unsigned long intervaloPulso = 300; // tiempo mínimo entre pulsos
 
 // * Prototipos
 void girarDerecha();
@@ -144,32 +148,47 @@ void loop()
     {
         direccionLuz = "DERECHA";
         girarDerecha();
+        if (seguirLuz)
+        {
+            avanzar();
+        }
+        else
+            frenar();
     }
     else if (valorLDRIzquierda > valorLDRDerecha + 50 && intensidadActual > 250)
     {
         direccionLuz = "IZQUIERDA";
         girarIzquierda();
+        if (seguirLuz)
+        {
+            avanzar();
+        }
+        else
+            frenar();
     }
     else if (abs(valorLDRDerecha - valorLDRIzquierda) <= 50 && intensidadActual > 250)
     {
         direccionLuz = "CENTRO";
         girarCentro();
+        if (seguirLuz)
+        {
+            avanzar();
+        }
+        else
+            frenar();
     }
     else
     {
         direccionLuz = "NINGUNA";
+        frenar();
     }
     enviarDireccionLuz();
     enviarEstadoTimon();
     enviarUltimaAccion();
     enviarIntensidadLuz();
-    //  *** Movimiento según luz ***
-    if (intensidadActual >= 250 && intensidadActual <= intensidadEspacio)
-        avanzar();
-    else
-        frenar();
 
-    delay(200);
+    
+    delay(80);
 }
 
 // * Timón
@@ -210,15 +229,37 @@ void frenar()
 void avanzar()
 {
     if (ultimaAccion == "AVANZAR")
-        return; // ya avanzando
+        return;
     if (ultimaAccion == "RETROCEDER")
-        return; // evita pelear relés
+        return;
 
     ultimaAccion = "AVANZAR";
 
+    unsigned long ahora = millis();
+
+    // no permitir avanzar muy seguido
+    if (ahora - ultimoPulso < intervaloPulso)
+        return;
+
+    ultimoPulso = ahora;
+
+    // Desactivar retroceso SIEMPRE antes de avanzar
     digitalWrite(relayRetroceder, LOW);
+
+    // Quitar freno
     digitalWrite(relayFreno, LOW);
+    delay(20); // <- IMPORTANTE (necesario para que el relé cambie)
+
+    // Activar avance
     digitalWrite(relayAvanzar, HIGH);
+    delay(120); // duracion del pulso de avance
+    digitalWrite(relayAvanzar, LOW);
+
+    // Frenada suave
+    ultimaAccion = "FRENAR";
+    digitalWrite(relayFreno, HIGH);
+    delay(50);
+    digitalWrite(relayFreno, LOW);
 }
 
 void retroceder()
@@ -319,8 +360,8 @@ void enviarTemperaturaHumedad()
 void enviarDistancias()
 {
     StaticJsonDocument<128> doc;
-    doc["distance_front"] = medirDistanciaAdelante();
-    doc["distance_back"] = medirDistanciaAtras();
+    doc["distance_front"] = distanciaAdelante;
+    doc["distance_back"] = distanciaAtras;
     serializeJson(doc, Serial);
     Serial.println();
 }
